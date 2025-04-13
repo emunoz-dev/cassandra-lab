@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: cassandra-lab
+spec:
+  serviceName: cassandra
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: cassandra
+          image: cassandra:4.0.17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9042
+              name: cql
+            - containerPort: 7000
+              name: transport
+            - containerPort: 7199
+              name: jmx
+          env:
+            # Reference env https://hub.docker.com/r/bitnami/cassandra
+            - name: MAX_HEAP_SIZE
+              value: 512M
+            - name: HEAP_NEWSIZE
+              value: 100M
+            - name: CASSANDRA_CLUSTER_NAME
+              value: "cassandraCluster"
+            - name: CASSANDRA_SEEDS
+              value: "cassandra-0.cassandra.cassandra-lab.svc.cluster.local" # Firts node such seed
+            - name: CASSANDRA_DC
+              value: "DC1-cassandraCluster"
+            - name: CASSANDRA_RACK
+              value: "RAC1"
+            # CUSTOM OPTIONS to enable jmx remote access
+            - name: JVM_OPTS
+              value: |
+                -Dcom.sun.management.jmxremote=true
+                -Dcassandra.jmx.remote.port=7199
+                -Dcom.sun.management.jmxremote.rmi.port=7199
+                -Dcom.sun.management.jmxremote.authenticate=false
+                -Dcom.sun.management.jmxremote.ssl=false
+            # -Djava.rmi.server.hostname=cassandra-lab # Hostname from service k8s
+            # If you disabled local JMX then overrides custom options and will failed get metrics 
+            #- name: LOCAL_JMX 
+            #  value: "no"
+
+        - name: jmx-export # Translate metrics from jmx format to prometheus format
+          image: openjdk:25-jdk-bullseye # JDK env to excute jmx_export jar
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7200 # Will be scrapping for prometheus
+              name: jmx-prom
+          volumeMounts:
+          - name: jmx-exporter-pvc
+            mountPath: /root/
+          # Entrypoint in k8s format
+          command: ["/bin/bash", "-c"]
+          args: 
+            - |
+              java -Xmx512M -jar /root/jmx_prometheus_standalone-1.2.0.jar 7200 /root/jmx_exporter.yaml
+      volumes:
+      - name: jmx-exporter-pvc
+        persistentVolumeClaim:
+          claimName: jmx-exporter-pvc

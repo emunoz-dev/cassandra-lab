@@ -1,0 +1,146 @@
+receivers:
+  jmx:
+    jar_path: /opt/opentelemetry-java-contrib-jmx-metrics.jar
+    #endpoint: service:jmx:rmi:///jndi/rmi://cassandra-lab:7199/jmxrmi
+    endpoint: cassandra-lab:7199
+    target_system: cassandra
+    collection_interval: 10s
+    
+    #initial_delay: 1s
+    # optional: the same as specifying OTLP receiver endpoint.
+    #otlp:
+    #  endpoint: mycollectorotlpreceiver:4317
+    #username: my_jmx_username
+    ## determined by the environment variable value
+    #password: ${env:MY_JMX_PASSWORD}
+    #resource_attributes:
+    #  my.attr: my.value
+    #  my.other.attr: my.other.value
+    #log_level: info
+    #additional_jars:
+    #  - /path/to/other.jar
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    #tls:
+    #  ca_file: "/path/to/ca.pem"
+    #  cert_file: "/path/to/cert.pem"
+    #  key_file: "/path/to/key.pem"
+    #namespace: test-space
+    #const_labels:
+    #  label1: value1
+    #  "another label": spaced value
+    #send_timestamps: true
+    #metric_expiration: 180m
+    #enable_open_metrics: true
+    #add_metric_suffixes: false
+    #resource_to_telemetry_conversion:
+    #  enabled: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [jmx]
+      exporters: [prometheus]
+
+
+#receivers:
+#  jmx:
+#    endpoint: "service:jmx:rmi:///jndi/rmi://127.0.0.1:7199/jmxrmi"
+#    target_system: "cassandra"
+#    username: ""
+#    password: ""
+#    otel_metrics:
+#      - name: "cassandra_jmx_metric"
+#        mbean: "org.apache.cassandra.metrics:type=ClientRequest,scope=Read,name=Latency"
+#        attribute: "Value"
+#        metric_type: "gauge"
+#        description: "Latency of client read requests"
+#        unit: "milliseconds"
+#
+#exporters:
+#  prometheus:
+#    endpoint: "0.0.0.0:9090"
+#
+#service:
+#  pipelines:
+#    metrics:
+#      receivers: [jmx]
+#      exporters: [prometheus]
+
+
+
+### Default Example:
+
+# To limit exposure to denial of service attacks, change the host in endpoints below from 0.0.0.0 to a specific network interface.
+# See https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/security-best-practices.md#safeguards-against-denial-of-service-attacks
+
+#extensions:
+#  health_check:
+#  pprof:
+#    endpoint: 0.0.0.0:1777
+#  zpages:
+#    endpoint: 0.0.0.0:55679
+#
+#receivers:
+#  otlp:
+#    protocols:
+#      grpc:
+#        endpoint: 0.0.0.0:4317
+#      http:
+#        endpoint: 0.0.0.0:4318
+#
+#  opencensus:
+#    endpoint: 0.0.0.0:55678
+#
+#  # Collect own metrics
+#  prometheus:
+#    config:
+#      scrape_configs:
+#      - job_name: 'otel-collector'
+#        scrape_interval: 10s
+#        static_configs:
+#        - targets: ['0.0.0.0:8888']
+#
+#  jaeger:
+#    protocols:
+#      grpc:
+#        endpoint: 0.0.0.0:14250
+#      thrift_binary:
+#        endpoint: 0.0.0.0:6832
+#      thrift_compact:
+#        endpoint: 0.0.0.0:6831
+#      thrift_http:
+#        endpoint: 0.0.0.0:14268
+#
+#  zipkin:
+#    endpoint: 0.0.0.0:9411
+#
+#processors:
+#  batch:
+#
+#exporters:
+#  debug:
+#    verbosity: detailed
+#
+#service:
+#
+#  pipelines:
+#
+#    traces:
+#      receivers: [otlp, opencensus, jaeger, zipkin]
+#      processors: [batch]
+#      exporters: [debug]
+#
+#    metrics:
+#      receivers: [otlp, opencensus, prometheus]
+#      processors: [batch]
+#      exporters: [debug]
+#
+#    logs:
+#      receivers: [otlp]
+#      processors: [batch]
+#      exporters: [debug]
+#
+#  extensions: [health_check, pprof, zpages]

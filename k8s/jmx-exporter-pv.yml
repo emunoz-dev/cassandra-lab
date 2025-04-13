@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jmx-exporter-pv
+  namespace: cassandra-lab
+spec:
+  capacity:
+    storage: 8.5Mi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain 
+  hostPath:
+    # Relative path doesn't works in k8s PV
+    path: /home/emunoz/cassandra-lab/k8s/jmx-pv # Change to your path
+    type: Directory

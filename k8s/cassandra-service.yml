@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: cassandra-lab
+  labels:
+    app: cassandra
+spec:
+  #type: LoadBalancer
+  clusterIP: None  # Headless Service. Allow comunication trhow DNS
+  selector:
+    app: cassandra
+  ports:
+    # Reference env https://hub.docker.com/r/bitnami/cassandra
+    - name: cql
+      port: 9042
+      targetPort: 9042
+    - name: transport
+      port: 7000
+      targetPort: 7000
+    - name: jmx
+      port: 7199
+      targetPort: 7199
+    # Port of JDK env container
+    - name: jmx-prom
+      port: 7200
+      targetPort: 7200
+
+
+
+
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: cassandra-metrics
+#  namespace: cassandra-lab
+#spec:
+#  type: LoadBalancer
+#  selector:
+#    app: cassandra
+#  ports:
+#  - protocol: TCP
+#    port: 8080
+#    targetPort: 8080

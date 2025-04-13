@@ -1,0 +1,95 @@
+version: "1.0.3"
+
+services:
+  cassandra: # DB Cassandra, NOSQL, developed in Java language
+    image: cassandra:4.0.17
+    container_name: cassandra-lab
+    ports:
+      - "7000:7000"
+      #- "7070:7070" # Local agent and expose data in prometheus format
+      - "7199:7199" # Expose JMX metrics to access remote
+    user: "root"
+    environment:
+      # LOCAL CONFS
+      #   Edit ./cassandra/cassandra-env.sh, in the end file.
+      #     Inject java args to run exporter in local mode.
+      # REMOTE CONFS
+      - LOCAL_JMX=no # Change default behavior of ./cassandra/cassandra-env.sh
+      # # if LOCAL_JMX=no then exports JVM_OPTS to enable remote JMX # See file, there are custom options to will be enable
+    volumes:
+      - "${PWD}/cassandra/cassandra-env.sh:/etc/cassandra/cassandra-env.sh"
+      # If you want customise export metrics then edit the next file. Default is enought
+      #- "${PWD}/cassandra/metrics-reporter-config-sample.yaml:/etc/cassandra/metrics-reporter-config-sample.yaml"
+      ### LOCAL AGENT
+      #- "${PWD}/cassandra-prom/jmx_prometheus_javaagent-1.2.0.jar:/jmx_prometheus_javaagent.jar"
+      #- "${PWD}/cassandra-prom/jmx_exporter.yaml:/jmx_exporter.yaml"
+    networks:
+      - cass-net
+  
+  jmx-export: # JDK env to execute remote exporter
+    image: openjdk:25-jdk-bullseye
+    container_name: jmx-export
+    ports:
+      - 7070:7070
+    networks:
+      - cass-net
+    entrypoint: ["/bin/bash", "-c"]
+    command: 
+      - |
+        java -Xmx512M -jar /jmx_prometheus_javaagent.jar 7070 /jmx_exporter.yaml
+    volumes:
+      - "${PWD}/cassandra-prom/jmx_prometheus_standalone-1.2.0.jar:/jmx_prometheus_javaagent.jar"
+      - "${PWD}/cassandra-prom/jmx_exporter.yaml:/jmx_exporter.yaml"
+
+  promwrt-lab: # Main Prometheus to scrape data and remote write.
+    image: prom/prometheus:v3.1.0
+    container_name: promwrt-lab
+    ports:
+      - "9090:9090"
+    networks:
+      - cass-net
+    environment:
+    volumes:
+      - "${PWD}/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"
+
+
+
+networks:
+  cass-net:
+    name: cass-net
+
+  ############
+  # DISABLE #
+  ##########
+    
+  #otel:
+  #  image: otel/opentelemetry-collector-contrib:0.122.0
+  #  #image: custom-otel:0.122.0
+  #  #build: ./otel-col
+  #  container_name: otel-lab
+  #  ports:
+  #    - 8888:8888 # Prometheus metrics exposed by the Collector
+  #    - 8889:8889 # Prometheus exporter metrics
+  #    - 4317:4317 # OTLP gRPC receiver
+  #    - 4318:4318 # OTLP http receiver
+  #  #environment:
+  #  #  - TMPDIR=
+  #  networks:
+  #    - cass-net
+  #  volumes:
+  #    - "${PWD}/otel-col/config.yaml:/etc/otelcol-contrib/config.yaml"
+  #    - "${PWD}/otel-col/opentelemetry-jmx-metrics.jar:/opt/opentelemetry-java-contrib-jmx-metrics.jar"
+  #    - "${PWD}/otel-col/tmp/:/tmp/"
+
+  #prom-cassandra:
+  #  image: bitnami/cassandra-exporter:latest
+  #  container_name: prom-cassandra
+  #  ports:
+  #    #- 8889:8889 # Prometheus exporter metrics
+  #    - 8080:8080
+  #  environment:
+  #  volumes:
+  #    - "${PWD}/cassandra-prom/config.yml:/opt/bitnami/cassandra-exporter/config.yml"
+  #  networks:
+  #    - cass-net
+

@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus-jmx
+  name: prometheus-jmx
+  namespace: cassandra-lab
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-jmx
+  strategy:
+  template:
+    metadata:
+      labels:
+        app: prometheus-jmx
+    spec:
+      containers:
+      - image: prom/prometheus:v3.2.1
+        imagePullPolicy: IfNotPresent
+        name: prom-jmx-container
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1"
+        volumeMounts:
+        - name: prom-jmx-configmap
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+      volumes:
+      - name: prom-jmx-configmap
+        configMap:
+          name: prom-jmx-configmap
+      terminationGracePeriodSeconds: 30
