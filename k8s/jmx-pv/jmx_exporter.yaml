@@ -12,17 +12,12 @@ rules:
   - pattern: ".*"
 
   # Testing transform Array String to number for enable scrape metric
-  #- pattern: 'org.apache.cassandra.db:type=StorageService,*'
   #- pattern: 'org.apache.cassandra.db<type=StorageService><>Tokens'
-  
-  
-  #- pattern: org.apache.cassandra.db<type=StorageService><>Tokens
-  #  name: cassandra_tokens
-  #  #type: UNTYPED
-  #  type: GAUGE
-  #  help: 'Number of tokens assigned to this node'
-  #  value: 4
-  #  #value: "{{value.length}}"
+    #value: 'len:Tokens'
+    #value: ${#Tokens}
+    #  value: "{{value.length}}"
+    #type: UNTYPED
+    #  type: GAUGE
 
 # Options of jmx_exporter
 

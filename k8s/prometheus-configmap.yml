@@ -26,4 +26,3 @@ data:
           - targets: ["cassandra-0.cassandra.cassandra-lab.svc.cluster.local:7200"]
           - targets: ["cassandra-1.cassandra.cassandra-lab.svc.cluster.local:7200"]
           - targets: ["cassandra-2.cassandra.cassandra-lab.svc.cluster.local:7200"]
-          #- targets: ["cassandra.cassandra-lab.svc.cluster.local:7200"]    

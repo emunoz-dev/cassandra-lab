@@ -1,4 +1,4 @@
-# K8S
+# K8S - Lab
 
 Create the cassandra-lab
 ```bash
@@ -15,6 +15,8 @@ kubectl apply -f ./k8s/prometheus-service.yml
 kubectl apply -f ./k8s/prometheus-configmap.yml
 kubectl apply -f ./k8s/cassandra-stfset.yml
 kubectl apply -f ./k8s/prometheus-deploy.yml
+kubectl apply -f ./k8s/grafana-service.yml
+kubectl apply -f ./k8s/grafana-deploy.yml
 ```
 
 Utils commands:
@@ -32,33 +34,68 @@ kubectl exec -it cassandra-0 -n cassandra-lab -- nodetool cfstats
 
 # Rollout satefulset
 kubectl rollout restart statefulset cassandra -n cassandra-lab
-# Forzar eliminación de pod en estado terminating
-kubectl delete pod <pod-name> --grace-period=0 --force
+# Force delete pod
+kubectl delete pod cassandra-0 -n cassandra-lab --grace-period=0 --force
 ```
-# Docker / Podman
 
-Create the cassandra-lab
-```bash
-podman-compose up -d
-```
 # PromQL
 
-- % DB loads by node
+List util metrics:
 
-```GO
-(
-  sum(org_apache_cassandra_metrics_Storage_Count{
-    name=~"Load",instance="cassandra-0.cassandra.cassandra-lab.svc.cluster.local:7200"
-    }
-  )
-  /
-  sum(
-    org_apache_cassandra_metrics_Storage_Count{
-      name=~"Load"
-    }
-  )
-) * 100
-```
+[Docs metrics](https://cassandra.apache.org/doc/stable/cassandra/operating/metrics.html)
+
+## State nodes on ring
+org_apache_cassandra_db_StorageService_Drained
+org_apache_cassandra_db_StorageService_Draining
+org_apache_cassandra_db_StorageService_Joined --> ok
+org_apache_cassandra_db_StorageService_Starting
+
+## Resrouces used
+java_lang_Memory_HeapMemoryUsage_used
+java_lang_Memory_NonHeapMemoryUsage_used
+
+java_lang_OperatingSystem_SystemCpuLoad
+
+CPU
+
+## Disk space
+org_apache_cassandra_metrics_Table_Value{name="TotalDiskSpaceUsed"}
+
+## Writes and reads
+org_apache_cassandra_metrics_Table_StdDev{name="ReadLatency"}
+
+## Compaction
+- Process that merge SSTable files to delete duplicate data or old data.
+
+org_apache_cassandra_metrics_Compaction_Value{name="PendingTasks"}
+org_apache_cassandra_metrics_Compaction_Count{name="BytesCompacted"}
+
+## Hints and reparations
+- The hints is a pending write, is a note.
+org_apache_cassandra_metrics_Storage_Count{name="TotalHints"}
+org_apache_cassandra_metrics_Storage_Count{name="TotalHintsInProgress"}
+
+- The reparations are the synchronization process of nodes. The next metrics shows total of bytes that should be repair.
+org_apache_cassandra_metrics_Table_Value{name="BytesUnrepaired"}
+
+## messages
+org_apache_cassandra_metrics_Messaging_StdDev{name="datacenter1-Latency"}
+
+sum(org_apache_cassandra_metrics_DroppedMessage_MeanRate{name="Dropped", instance="cassandra-0.cassandra.cassandra-lab.svc.cluster.local:7200"})
+
+org_apache_cassandra_net_MessagingService_TotalTimeouts
+
+## ThreadPools
+- Multiple tasks by pool or by type tasks
+
+org_apache_cassandra_metrics_ThreadPools_Value{name="ActiveTasks"}
+org_apache_cassandra_metrics_ThreadPools_Value{name="PendingTasks"}
+
+
+### Grafana dashboards
+Acces into grafana container:
+  - localhost:30000
+Import k8s/grfn-dashboard-cassandra.json dashboard
 
 ## JMX Explorer data
 
@@ -94,4 +131,9 @@ info
 # get total tokens by node, get atribute
 get Tokens
 ```
+# Docker / Podman - Lab
 
+Create the cassandra-lab
+```bash
+podman-compose up -d
+```

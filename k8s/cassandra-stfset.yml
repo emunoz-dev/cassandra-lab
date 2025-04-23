@@ -20,14 +20,15 @@ spec:
           image: cassandra:4.0.17
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 9042
+            - containerPort: 9042 # Default port to connect DB
               name: cql
-            - containerPort: 7000
+            - containerPort: 7000 # Default port to protocol "gossip", comunication betwen cluster
               name: transport
-            - containerPort: 7199
+            - containerPort: 7199 # Default port to acces jmx metrics and Mbeans objects
               name: jmx
           env:
             # Reference env https://hub.docker.com/r/bitnami/cassandra
+            # https://kubernetes.io/docs/tutorials/stateful-application/cassandra/
             - name: MAX_HEAP_SIZE
               value: 512M
             - name: HEAP_NEWSIZE

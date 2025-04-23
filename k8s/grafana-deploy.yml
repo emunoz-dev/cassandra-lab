@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana-cassandra-lab
+  name: grafana-cassandra-lab
+  namespace: cassandra-lab
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana-cassandra-lab
+  strategy:
+  template:
+    metadata:
+      labels:
+        app: grafana-cassandra-lab
+    spec:
+      containers:
+      - image: grafana/grafana-oss:11.6.0
+        imagePullPolicy: IfNotPresent
+        name: grfn-cassandra-container
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1"
+      terminationGracePeriodSeconds: 30
