@@ -1,0 +1,259 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cassandra
+  namespace: cassandra-lab
+  labels:
+    app: cassandra
+spec:
+  clusterIP: None  # Headless Service. Allow comunication trhow DNS
+  selector:
+    app: cassandra
+  ports:
+    # Reference env https://hub.docker.com/r/bitnami/cassandra
+    - name: cql
+      port: 9042
+      targetPort: 9042
+    - name: transport
+      port: 7000
+      targetPort: 7000
+    - name: jmx
+      port: 7199
+      targetPort: 7199
+    # Port of JDK env container
+    - name: jmx-prom
+      port: 7200
+      targetPort: 7200
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: jmx-exporter-pv
+  namespace: cassandra-lab
+spec:
+  capacity:
+    storage: 8.5Mi
+  accessModes:
+    - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain 
+  hostPath:
+    # Relative path doesn't works in k8s PV
+    path: /home/emunoz/cassandra-lab/k8s/jmx-pv # Change to your path
+    type: Directory
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jmx-exporter-pvc
+  namespace: cassandra-lab
+spec:
+  accessModes:
+    - ReadOnlyMany  
+  resources:
+    requests:
+      storage: 8.5Mi
+  volumeName: jmx-exporter-pv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-jmx
+  namespace: cassandra-lab
+  labels:
+    app: prometheus-jmx
+spec:
+  type: LoadBalancer # ClusterIP
+  selector:
+    app: prometheus-jmx
+  ports:
+    - name: prom
+      port: 9090
+      targetPort: 9090
+      nodePort: 30090
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prom-jmx-configmap
+  labels: 
+    app: prometheus-jmx
+  namespace: cassandra-lab
+data:
+  prometheus.yml: |
+    
+    # my global config
+    global:
+      scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+      evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+      # scrape_timeout is set to the global default (10s).
+
+
+    # A scrape configuration containing exactly one endpoint to scrape:
+    # Here it's Prometheus itself.
+    scrape_configs:
+      # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+      - job_name: "cassandra"
+        # metrics_path defaults to '/metrics'
+        # scheme defaults to 'http'.
+        static_configs:
+          - targets: ["cassandra-0.cassandra.cassandra-lab.svc.cluster.local:7200"]
+          - targets: ["cassandra-1.cassandra.cassandra-lab.svc.cluster.local:7200"]
+          - targets: ["cassandra-2.cassandra.cassandra-lab.svc.cluster.local:7200"]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+  namespace: cassandra-lab
+spec:
+  serviceName: cassandra
+  replicas: 3
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: cassandra
+          image: cassandra:4.0.17
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9042 # Default port to connect DB
+              name: cql
+            - containerPort: 7000 # Default port to protocol "gossip", comunication betwen cluster
+              name: transport
+            - containerPort: 7199 # Default port to acces jmx metrics and Mbeans objects
+              name: jmx
+          env:
+            # Reference env https://hub.docker.com/r/bitnami/cassandra
+            # https://kubernetes.io/docs/tutorials/stateful-application/cassandra/
+            - name: MAX_HEAP_SIZE
+              value: 512M
+            - name: HEAP_NEWSIZE
+              value: 100M
+            - name: CASSANDRA_CLUSTER_NAME
+              value: "cassandraCluster"
+            - name: CASSANDRA_SEEDS
+              value: "cassandra-0.cassandra.cassandra-lab.svc.cluster.local" # Firts node such seed
+            - name: CASSANDRA_DC
+              value: "DC1-cassandraCluster"
+            - name: CASSANDRA_RACK
+              value: "RAC1"
+            # CUSTOM OPTIONS to enable jmx remote access
+            - name: JVM_OPTS
+              value: |
+                -Dcom.sun.management.jmxremote=true
+                -Dcassandra.jmx.remote.port=7199
+                -Dcom.sun.management.jmxremote.rmi.port=7199
+                -Dcom.sun.management.jmxremote.authenticate=false
+                -Dcom.sun.management.jmxremote.ssl=false
+            # -Djava.rmi.server.hostname=cassandra-lab # Hostname from service k8s
+            # If you disabled local JMX then overrides custom options and will failed get metrics 
+            #- name: LOCAL_JMX 
+            #  value: "no"
+
+        - name: jmx-export # Translate metrics from jmx format to prometheus format
+          image: openjdk:25-jdk-bullseye # JDK env to excute jmx_export jar
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7200 # Will be scrapping for prometheus
+              name: jmx-prom
+          volumeMounts:
+          - name: jmx-exporter-pvc
+            mountPath: /root/
+          # Entrypoint in k8s format
+          command: ["/bin/bash", "-c"]
+          args: 
+            - |
+              java -Xmx512M -jar /root/jmx_prometheus_standalone-1.2.0.jar 7200 /root/jmx_exporter.yaml
+      volumes:
+      - name: jmx-exporter-pvc
+        persistentVolumeClaim:
+          claimName: jmx-exporter-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: prometheus-jmx
+  name: prometheus-jmx
+  namespace: cassandra-lab
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-jmx
+  strategy:
+  template:
+    metadata:
+      labels:
+        app: prometheus-jmx
+    spec:
+      containers:
+      - image: prom/prometheus:v3.2.1
+        imagePullPolicy: IfNotPresent
+        name: prom-jmx-container
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1"
+        volumeMounts:
+        - name: prom-jmx-configmap
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+      volumes:
+      - name: prom-jmx-configmap
+        configMap:
+          name: prom-jmx-configmap
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: cassandra-lab
+  labels:
+    app: grafana-cassandra-lab
+spec:
+  type: LoadBalancer # ClusterIP
+  selector:
+    app: grafana-cassandra-lab
+  ports:
+    - name: grfn
+      port: 3000
+      targetPort: 3000
+      nodePort: 30000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana-cassandra-lab
+  name: grafana-cassandra-lab
+  namespace: cassandra-lab
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana-cassandra-lab
+  strategy:
+  template:
+    metadata:
+      labels:
+        app: grafana-cassandra-lab
+    spec:
+      containers:
+      - image: grafana/grafana-oss:11.6.0
+        imagePullPolicy: IfNotPresent
+        name: grfn-cassandra-container
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1"
+      terminationGracePeriodSeconds: 30

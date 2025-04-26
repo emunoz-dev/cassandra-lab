@@ -6,17 +6,7 @@ Create the cassandra-lab
 # Create ns
 kubectl create namespace cassandra-lab
 # Create objects
-kubectl apply -f ./k8s/cassandra-service.yml
-# Create PV, replace for your absolute path
-kubectl apply -f ./k8s/jmx-exporter-pv.yml
-############
-kubectl apply -f ./k8s/jmx-exporter-pvc.yml
-kubectl apply -f ./k8s/prometheus-service.yml
-kubectl apply -f ./k8s/prometheus-configmap.yml
-kubectl apply -f ./k8s/cassandra-stfset.yml
-kubectl apply -f ./k8s/prometheus-deploy.yml
-kubectl apply -f ./k8s/grafana-service.yml
-kubectl apply -f ./k8s/grafana-deploy.yml
+kubectl apply -f ./k8s/complete-lab.yml
 ```
 
 Utils commands:
@@ -45,57 +35,65 @@ List util metrics:
 [Docs metrics](https://cassandra.apache.org/doc/stable/cassandra/operating/metrics.html)
 
 ## State nodes on ring
+```promql
 org_apache_cassandra_db_StorageService_Drained
 org_apache_cassandra_db_StorageService_Draining
-org_apache_cassandra_db_StorageService_Joined --> ok
+org_apache_cassandra_db_StorageService_Joined
 org_apache_cassandra_db_StorageService_Starting
+```
 
 ## Resrouces used
+```promql
 java_lang_Memory_HeapMemoryUsage_used
 java_lang_Memory_NonHeapMemoryUsage_used
-
+# CPU
 java_lang_OperatingSystem_SystemCpuLoad
-
-CPU
+```
 
 ## Disk space
+``` PromQL
 org_apache_cassandra_metrics_Table_Value{name="TotalDiskSpaceUsed"}
-
+```
 ## Writes and reads
+```
 org_apache_cassandra_metrics_Table_StdDev{name="ReadLatency"}
-
+```
 ## Compaction
 - Process that merge SSTable files to delete duplicate data or old data.
-
+```
 org_apache_cassandra_metrics_Compaction_Value{name="PendingTasks"}
 org_apache_cassandra_metrics_Compaction_Count{name="BytesCompacted"}
-
+```
 ## Hints and reparations
 - The hints is a pending write, is a note.
+```
 org_apache_cassandra_metrics_Storage_Count{name="TotalHints"}
 org_apache_cassandra_metrics_Storage_Count{name="TotalHintsInProgress"}
-
+```
 - The reparations are the synchronization process of nodes. The next metrics shows total of bytes that should be repair.
+```
 org_apache_cassandra_metrics_Table_Value{name="BytesUnrepaired"}
-
+```
 ## messages
+```
 org_apache_cassandra_metrics_Messaging_StdDev{name="datacenter1-Latency"}
 
 sum(org_apache_cassandra_metrics_DroppedMessage_MeanRate{name="Dropped", instance="cassandra-0.cassandra.cassandra-lab.svc.cluster.local:7200"})
 
 org_apache_cassandra_net_MessagingService_TotalTimeouts
-
+```
 ## ThreadPools
 - Multiple tasks by pool or by type tasks
-
+```
 org_apache_cassandra_metrics_ThreadPools_Value{name="ActiveTasks"}
 org_apache_cassandra_metrics_ThreadPools_Value{name="PendingTasks"}
-
+```
 
 ### Grafana dashboards
 Acces into grafana container:
   - localhost:30000
-Import k8s/grfn-dashboard-cassandra.json dashboard
+    - admin / admin
+    - Import k8s/grfn-dashboard-cassandra.json dashboard
 
 ## JMX Explorer data
 
